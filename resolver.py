@@ -8,6 +8,11 @@ import re
 import socket
 import sys
 from bs4 import BeautifulSoup
+try:
+	import dns.resolver
+except:
+	print("You need the DNS Python library from http://www.dnspython.org")
+	exit(1)
 
 menu = """\n
    _____ _      ____  _    _ _____  ______ _____ _____  ______ 
@@ -27,6 +32,24 @@ DEFAULT_USER_AGENTS = {
     "Windows":{"User-Agent": "Mozilla/5.0 (Windows NT 6.3; Win64; x64; rv:57.0) Gecko/20100101 Firefox/57.0"},
     }
 
+def checkDomain(domain):
+	list_dns = []
+	try:
+		answers = dns.resolver.query(domain, 'MX')
+		for domains in answers.rrset:
+			list_dns.append(str(domains).split()[1])
+
+		return (list_dns)
+	except:
+		return False
+
+def checkMXResolve(mx):
+	try:
+		answers = dns.resolver.query(mx, 'A')
+		return str(answers[0])
+	except:
+		return False
+
 def DNS_Cloudfire(url):
 	new_url = url.split('/')
 	tam = len(new_url)
@@ -37,13 +60,18 @@ def DNS_Cloudfire(url):
 		bs.find_all("br")
 		print("[+] Channel Analysis: %s\n"%Channel)
 		print("[=>] Server: %s"%url)
+
 		try:
-			print("[+] Name Server Official: %s"%socket.gethostbyaddr(new_url[tam-1].strip("www")[0]))
-			print("[+] IP Real is: %s"%socket.gethostbyaddr(new_url[tam-1].strip("www")[2][0]))
+			print("[+] MX Servers: %s"%checkMXResolve(new_url[tam-1]))
+			print('\n')
+			for domains in checkDomain(new_url[tam-1]):
+				print("[+] Name Server: %s\n[+] IP Real is: %s"%(domains, socket.gethostbyname(domains)))
 		except:
-			print("[+] IP Real is: %s"%socket.gethostbyname(new_url[tam-1]))
+			pass
+
 		if bs:
 			name_servers = re.findall(r"[\w.][\w.][\w.]+\.+[\w.][\w.][\w.]+\.+[\w.][\w.][\w.]", bs.get_text())
+			print('\n')
 			for name in name_servers:
 				if 'cloud' in name:
 					print("[+] CloudFare Name Server: %s\n[+] IP Cloudfare: %s"%(name, socket.gethostbyname(name)))
@@ -57,7 +85,7 @@ def DNS_Cloudfire(url):
 
 def main():
 	if len(sys.argv) < 3:
-		print(menu+"\nFailed to start TOOL...")
+		print(menu+"\n\tMethod Usage:\n\n\t\troot@localhost~# python %s -d domain.com"%sys.argv[0])
 		exit(1)
 	else:
 		url = sys.argv[2]
